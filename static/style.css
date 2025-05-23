@@ -1,0 +1,40 @@
+body {
+    font-family: Arial, sans-serif;
+}
+
+.sync-card {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 10px;
+    background-color: #f8f9fa;
+}
+
+.sync-card h5 {
+    margin: 0 0 10px 0;
+}
+
+.sync-card p {
+    margin: 5px 0;
+}
+
+#addClientBtn {
+    margin-top: 10px;
+}
+
+.modal-header {
+    background-color: #007bff;
+    color: #fff;
+}
+
+.logout-icon {
+    font-size: 24px;
+    color: #ff0000;
+    cursor: pointer;
+}
+
+input[type="password"]:focus {
+    outline: none;
+    box-shadow: none;
+    border-color: initial;
+}

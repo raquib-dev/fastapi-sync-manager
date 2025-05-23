@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Sync Manager</title>
+    <!-- Bootstrap for responsive design -->
+    <link rel="stylesheet" href="/static/bootstrap/css/4.5.2-bootstrap.min.css">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="/static/font-awesome/6.0.0-beta3-all.min.css">
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Include jQuery -->
+    <script src="/static/jquery/jquery-3.5.1.min.js"></script>
+
+    <!-- Include Select2 CSS -->
+    <link href="/static/select2/select2.min.css" rel="stylesheet" />
+
+    <link rel="icon" href="/static/logo.png" type="image/x-icon" />
+
+    <style>
+        .toast-modern {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s ease-in-out;
+            position: relative;
+        }
+
+        .toast-modern.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast-body {
+            font-size: 16px;
+            padding: 10px 15px;
+        }
+
+        .btn-close {
+            opacity: 0.5;
+        }
+
+        .btn-close:hover {
+            opacity: 1;
+        }
+
+        .toast-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background-color: rgba(255, 255, 255, 0.8);
+            width: 100%;
+            transition: width 3s linear;
+        }
+
+        .progress-bar {
+            position: relative;
+            /* Allow absolute positioning for the text */
+            text-align: center;
+            /* Center the text horizontally */
+        }
+
+        .progress-text {
+            position: absolute;
+            width: 100%;
+            /* Take up the full width of the progress bar */
+            left: 0;
+            top: 0;
+            bottom: 0;
+            display: flex;
+            /* Use flexbox for centering */
+            align-items: center;
+            /* Center the text vertically */
+            justify-content: center;
+            /* Center the text horizontally */
+            color: black;
+            /* Text color for good visibility */
+            font-weight: bold;
+            pointer-events: none;
+            /* Ensure the text doesn’t interfere with any interactions */
+        }
+
+        /* Full-page overlay */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.3);
+            /* Semi-transparent background */
+            z-index: 9999;
+            /* Highest priority */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            /* Initially, it does not block interactions */
+            transition: opacity 0.3s ease;
+        }
+
+        /* Show overlay and prevent interaction */
+        .overlay.active {
+            opacity: 1;
+            pointer-events: all;
+            /* Now it blocks interactions */
+        }
+
+        /* Optional: Blur effect for the background */
+        .blur {
+            filter: blur(5px);
+            pointer-events: none;
+        }
+
+        /* Optional styling to make the dropdown look better */
+        .select2-container--default .select2-selection--multiple {
+            border-radius: 4px;
+            border: 1px solid #ced4da;
+            padding: 5px;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <!-- Loading Spinner & Overlay -->
+    <div id="overlay" class="overlay">
+        <div class="spinner-border text-primary" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
+
+    <!-- Navbar with "Create Client" and "Logout" buttons -->
+    <nav class="navbar navbar-light bg-light justify-content-between">
+        <a class="navbar-brand">File Sync Manager</a>
+        <div>
+            <a href="/create-client" class="btn btn-warning">Create Client</a>
+            <a href="/create-command" class="btn btn-info ml-2">Create Command</a>
+            <a href="/logout" class="btn btn-danger ml-2">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <h1>Create New Sync Request</h1>
+        <!-- Sync Request Form -->
+        <form id="syncForm" class="mt-4">
+            <div class="form-row">
+                <div class="col-md-6 mt-3">
+                    <label for="client">Select Client:</label>
+                    <select id="client" name="client_id" class="form-control" required>
+                        <option value="">Select Client</option>
+                    </select>
+                </div>
+                <input type="hidden" id="hostname" name="hostname">
+                <input type="hidden" id="username" name="username">
+                <input type="hidden" id="password" name="password">
+                <input type="hidden" id="client_id" name="client_id">
+
+                <div class="col-md-6 mt-3">
+                    <label for="local_dir">Local Directory Path:</label>
+                    <input type="text" id="local_dir" name="local_directory_path" class="form-control" required>
+                </div>
+                <div class="col-md-6 mt-3">
+                    <label for="remote_dir">Remote Directory Path:</label>
+                    <input type="text" id="remote_dir" name="remote_directory_path" class="form-control" required>
+                </div>
+                <div class="col-md-6 mt-3">
+                    <label for="sudo_commands">Sudo Commands (multi-select):</label>
+                    <select id="sudo_commands" name="sudo_commands" class="form-control" multiple="multiple" required>
+                        <!-- Options will be dynamically populated by JavaScript -->
+                    </select>
+                </div>
+            </div>
+            <button id="submitBtn" type="submit" class="btn btn-primary mt-3">Submit Sync Request</button>
+        </form>
+
+        <h2 class="mt-5 d-flex justify-content-between align-items-center">
+            Sync Requests
+            <div>
+                <label for="filter-status" class="mr-2">Filter by Status:</label>
+                <select id="filter-status" class="form-control-sm">
+                    <option value="all">All</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="failed">Failed</option>
+                    <option value="incomplete">Incomplete</option> <!-- New filter -->
+                </select>
+            </div>
+        </h2>
+
+        <div id="syncRequests" class="row"></div>
+    </div>
+
+    <script src="/static/jquery/jquery-3.5.1.min.js"></script>
+    <script src="/static/bootstrap/js/4.5.2-bootstrap.bundle.min.js"></script>
+    <script src="/static/select2/select2.min.js"></script>
+
+    <script>
+
+        // Get the overlay element
+        const overlay = document.getElementById("overlay");
+
+        // Function to show spinner and make background inaccessible
+        function showLoadingSpinner() {
+            overlay.classList.add('active');  // Show overlay
+            document.body.classList.add('blur');  // Add blur effect to background
+        }
+
+        // Function to hide spinner and restore the background
+        function hideLoadingSpinner() {
+            overlay.classList.remove('active');  // Hide overlay
+            document.body.classList.remove('blur');  // Remove blur effect from background
+        }
+
+        const form = document.getElementById('syncForm');
+        const syncRequestsDiv = document.getElementById('syncRequests');
+        let reloadInterval = null;  // Store the reload interval globally
+        let isUpdate = false;
+        let syncIdToUpdate = null;
+        let filterStatus = 'incomplete'; // Initialize filter status to 'all'
+        // Declare selectedCommandsArray in global scope
+        let selectedCommandsArray = [];
+
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            const formData = new FormData(form);
+            const selectedClientId = document.getElementById('client').value;
+            formData.append('client_id', selectedClientId);
+
+            // Clear existing sudo_commands entries in formData (if any)
+            formData.delete('sudo_commands');
+
+            // Append selected commands in the correct order
+            selectedCommandsArray.forEach(command => {
+                formData.append('sudo_commands', command);  // Appending each command in order
+            });
+
+            console.log("Post Value Sudo commands (in order):", selectedCommandsArray);
+
+            const formParams = new URLSearchParams();
+            formData.forEach((value, key) => {
+                formParams.append(key, value);
+            });
+
+            showLoadingSpinner();  // Show loading spinner before fetch
+
+            const url = isUpdate ? `/update-sync/${syncIdToUpdate}` : '/create_sync';
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: formParams.toString()  // Send form data with commands in correct order
+                });
+
+                if (response.ok) {
+                    filterStatus = 'incomplete';
+                    loadSyncRequests(filterStatus);
+                    document.getElementById('filter-status').value = 'incomplete';
+                    showToast(isUpdate ? 'Sync request updated successfully' : 'Sync request created successfully', 'success');
+                } else if (response.status === 400) {
+                    showToast('Bad request. Please check your input.', 'danger');
+                } else if (response.status === 500) {
+                    showToast('Server error. Please try again later.', 'danger');
+                } else {
+                    showToast('Failed to process sync request', 'danger');
+                }
+            } catch (error) {
+                console.error('Error during sync request:', error);
+                showToast('Network error. Please check your connection.', 'danger');
+            } finally {
+                hideLoadingSpinner();  // Hide spinner in any case (success or failure)
+            }
+        });
+
+        function editSyncRequest(syncId) {
+            showLoadingSpinner();
+            fetch(`/sync-request/${syncId}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('client').value = data.client_id;
+                    document.getElementById('local_dir').value = data.local_directory_path;
+                    document.getElementById('remote_dir').value = data.remote_directory_path;
+                    document.getElementById('sudo_commands').value = data.sudo_commands;
+                    document.getElementById('submitBtn').innerText = "Update Sync Request";
+                    isUpdate = true;
+                    syncIdToUpdate = syncId;
+                    hideLoadingSpinner();
+                })
+                .catch(error => console.log('Error fetching sync request:', error));
+
+            hideLoadingSpinner();
+        }
+
+        function resetForm() {
+            form.reset();
+            document.getElementById('submitBtn').innerText = "Submit Sync Request";
+            isUpdate = false;
+            syncIdToUpdate = null;
+        }
+
+        // Function to load sync requests dynamically with filtering
+        async function loadSyncRequests(filterStatus = 'all') {
+            const response = await fetch(`/sync-requests?filter=${filterStatus}`);
+            const syncRequests = await response.json();
+
+            syncRequestsDiv.innerHTML = '';  // Clear the sync requests section
+
+            let hasPendingOrInProgress = false;
+
+            syncRequests.forEach(syncData => {
+                // Logic for filtering based on filterStatus
+                if (
+                    filterStatus === 'all' ||  // Show all requests
+                    (filterStatus === 'incomplete' && syncData.status !== 'completed') ||  // Show all except completed
+                    syncData.status === filterStatus  // Show only the selected status
+                ) {
+                    const progress = Math.min(syncData.progress, 100);  // Ensure progress does not exceed 100%
+
+                    // Split the sudo_commands string by commas to calculate the total number of commands
+                    const totalCommands = syncData.total_commands;
+
+                    // Define buttons for retry and info
+                    let retryButton = '';
+                    let infoButton = `
+                <button class="btn btn-info btn-sm" onclick="showClientDetails(${syncData.id}, ${syncData.client_id})">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+            `;
+
+                    // Add pencil icon to edit only failed requests
+                    let editButton = '';
+                    if (syncData.status === 'failed') {
+                        editButton = `
+                    <button class="btn btn-primary btn-sm" onclick="editSyncRequest(${syncData.id})">
+                        <i class="fas fa-pencil-alt"></i> Edit
+                    </button>
+                `;
+                    }
+
+                    if (syncData.status === 'failed') {
+                        retryButton = `
+                    <button class="btn btn-warning btn-sm" onclick="retrySyncRequest(${syncData.id})">
+                        <i class="fas fa-redo"></i> Retry
+                    </button>
+                `;
+                    }
+
+                    // Determine the status label color based on the sync status
+                    let statusLabelClass = '';
+                    switch (syncData.status) {
+                        case 'in_progress':
+                            statusLabelClass = 'bg-warning text-dark';  // Yellow for in-progress
+                            break;
+                        case 'completed':
+                            statusLabelClass = 'bg-success text-white';  // Green for completed
+                            break;
+                        case 'failed':
+                            statusLabelClass = 'bg-danger text-white';   // Red for failed
+                            break;
+                        default:
+                            statusLabelClass = 'bg-secondary text-white'; // Grey for others (pending)
+                            break;
+                    }
+
+                    // Update the card HTML to include the client name
+                    const requestCard = `
+                <div class="col-md-4">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h4 class="card-title">Request ID: ${syncData.id}</h4> <!-- Display client name -->
+                            <p>Client: ${syncData.client_name}</p>
+                            <p>Status: <span class="badge ${statusLabelClass}">${syncData.status.replace('_', ' ')}</span></p>
+                            <p>Commands Executed: ${syncData.sudo_commands_executed} of ${totalCommands}</p>
+                            <!-- Progress Bar -->
+                            <div class="progress mb-3" style="position: relative;">
+                                <div class="progress-bar" role="progressbar" style="width: ${progress}%" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"></div>
+                                <span class="progress-text" style="position: absolute; width: 100%; left: 0; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; color: black; font-weight: bold; pointer-events: none;">
+                                    ${progress}%
+                                </span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                ${infoButton}
+                                ${retryButton}
+                                ${editButton}  <!-- Conditionally show edit button -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+                    syncRequestsDiv.insertAdjacentHTML('beforeend', requestCard);
+                }
+
+                // Check if there are any pending or in-progress tasks
+                if (syncData.status === 'pending' || syncData.status === 'in_progress') {
+                    hasPendingOrInProgress = true;
+                }
+            });
+
+            // Reload every second if there's a pending or in-progress sync in the filtered data
+            if (hasPendingOrInProgress) {
+                reloadInterval = setTimeout(() => loadSyncRequests(filterStatus), 1000);
+            } else {
+                clearTimeout(reloadInterval); // Stop reloading if all syncs are completed
+                reloadInterval = null;  // Reset the interval
+            }
+        }
+
+        // Add filter functionality for sync requests
+        document.getElementById('filter-status').addEventListener('change', function () {
+
+            showLoadingSpinner();
+
+            const newFilterStatus = this.value;
+
+            // Clear the existing interval before starting a new one
+            if (reloadInterval) {
+                clearTimeout(reloadInterval);
+                reloadInterval = null;
+            }
+
+            FilterStatus = this.value;
+
+            // Load the sync requests with the new filter status
+            loadSyncRequests(newFilterStatus);
+            hideLoadingSpinner();
+        });
+
+        async function loadClients() {
+            const clientDropdown = document.getElementById('client');
+            const response = await fetch('/clients');
+            const clients = await response.json();
+            clients.forEach(client => {
+                const option = document.createElement('option');
+                option.value = client.id;
+                option.textContent = client.name;
+                clientDropdown.appendChild(option);
+            });
+
+            clientDropdown.addEventListener('change', function () {
+                const selectedClient = clients.find(client => client.id == this.value);
+                if (selectedClient) {
+                    document.getElementById('hostname').value = selectedClient.hostname;
+                    document.getElementById('username').value = selectedClient.username;
+                    document.getElementById('password').value = selectedClient.password;
+                    document.getElementById('client_id').value = selectedClient.id;
+                }
+            });
+        }
+
+        // Load sync requests on page load with default 'all' filter
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('filter-status').value = 'incomplete'; // Ensure filter dropdown is set to 'incomplete'
+            loadSyncRequests('incomplete'); // Load all sync requests on page load
+            loadClients();
+        });
+
+        function retrySyncRequest(syncId) {
+            showLoadingSpinner();
+            fetch(`/retry-sync/${syncId}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    hideLoadingSpinner();
+                    showToast(data.message, 'success');
+                    loadSyncRequests(filterStatus);
+                });
+            hideLoadingSpinner();
+        }
+
+        function showClientDetails(syncId, clientId) {
+            showLoadingSpinner();
+            Promise.all([
+                fetch(`/client/${clientId}`).then(response => response.json()),
+                fetch(`/sync-request/${syncId}`).then(response => response.json())
+            ])
+                .then(([client, syncTask]) => {
+                    hideLoadingSpinner();
+                    alert(`
+                            Client Name: ${client.name}
+                            Hostname: ${client.hostname}
+                            Username: ${client.username}
+                            Local Directory: ${syncTask.local_directory_path}
+                            Remote Directory: ${syncTask.remote_directory_path}
+                            Sudo Commands: ${syncTask.sudo_commands}
+                        `);
+                })
+                .catch(error => console.log('Error fetching client or sync request details:', error));
+
+            hideLoadingSpinner();
+        }
+
+        function showToast(message, type) {
+            let toastContainer = document.getElementById("toast-container");
+            if (!toastContainer) return;
+
+            toastContainer.innerHTML = '';
+
+            let toast = document.createElement("div");
+            toast.className = `toast align-items-center text-white bg-${type} border-0 toast-modern show`;
+            toast.style.position = "fixed";
+            toast.style.top = "10px";
+            toast.style.right = "10px";
+            toast.style.minWidth = "250px";
+            toast.style.zIndex = "9999";
+            toast.innerHTML = `
+                        <div class="d-flex">
+                            <div class="toast-body">${message}</div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-progress"></div>`;
+
+            toastContainer.appendChild(toast);
+
+            let progressBar = toast.querySelector('.toast-progress');
+            progressBar.style.width = "100%";
+            setTimeout(() => {
+                progressBar.style.width = "0%";
+            }, 50);
+
+            setTimeout(function () {
+                toast.classList.remove('show');
+                toast.addEventListener('transitionend', () => {
+                    toast.remove();
+                });
+            }, 3000);
+
+            toast.querySelector('.btn-close').addEventListener('click', function () {
+                toast.classList.remove('show');
+                toast.addEventListener('transitionend', () => {
+                    toast.remove();
+                });
+            });
+        }
+
+        // Async function to load commands from the server
+        async function loadCommands() {
+            const commandDropdown = document.getElementById('sudo_commands');
+
+            try {
+                // Fetch commands from the server
+                const response = await fetch('/commands');
+                const commands = await response.json();
+
+                // Populate the dropdown with fetched commands
+                commands.forEach(cmd => {
+                    const option = new Option(cmd.command, cmd.command);  // Command as both value and text
+                    commandDropdown.appendChild(option);
+                });
+
+                // Initialize Select2 after loading the commands
+                $('#sudo_commands').select2({
+                    placeholder: "Select commands",
+                    allowClear: true,
+                    closeOnSelect: false  // Allow multiple selections without closing
+                });
+
+                // Handle select event to capture the order
+                $('#sudo_commands').on('select2:select', function (e) {
+                    let command = e.params.data.id;
+                    if (!selectedCommandsArray.includes(command)) {
+                        selectedCommandsArray.push(command);  // Add to array in the order selected
+                    }
+                    console.log("Selected commands (in order):", selectedCommandsArray);
+                });
+
+                // Handle unselect event
+                $('#sudo_commands').on('select2:unselect', function (e) {
+                    let command = e.params.data.id;
+                    selectedCommandsArray = selectedCommandsArray.filter(item => item !== command);  // Remove unselected command
+                    console.log("Selected commands (after unselect):", selectedCommandsArray);
+                });
+
+            } catch (error) {
+                console.error("Error fetching commands:", error);
+            }
+        }
+
+        // Load commands when the document is ready
+        $(document).ready(function () {
+            loadCommands();  // Call the async function to load commands
+        });
+
+    </script>
+
+</body>
+
+</html>

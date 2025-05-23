@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create New Client</title>
+    <link rel="stylesheet" href="/static/bootstrap/css/4.5.2-bootstrap.min.css">
+    <script src="/static/jquery/jquery-3.5.1.min.js"></script>
+    <script src="/static/font-awesome/6.0.0-beta3-all.min.js"></script>
+    <link rel="icon" href="/static/logo.png" type="image/x-icon" />
+
+    <style>
+        .toast-modern {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            /* Adds a subtle shadow */
+            border-radius: 8px;
+            /* Rounds the edges */
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s ease-in-out;
+            /* Smooth fade and move-in animation */
+            position: relative;
+        }
+
+        .toast-modern.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast-body {
+            font-size: 16px;
+            /* Slightly larger font */
+            padding: 10px 15px;
+        }
+
+        .btn-close {
+            opacity: 0.5;
+            /* Reduced opacity for the close button */
+        }
+
+        .btn-close:hover {
+            opacity: 1;
+            /* Hover effect for close button */
+        }
+
+        /* Progress bar at the bottom */
+        .toast-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background-color: rgba(255, 255, 255, 0.8);
+            /* Light color for the progress bar */
+            width: 100%;
+            transition: width 3s linear;
+            /* Controls the progress animation duration */
+        }
+
+        /* Full-page overlay */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.3);
+            /* Semi-transparent background */
+            z-index: 9999;
+            /* Highest priority */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            /* Initially, it does not block interactions */
+            transition: opacity 0.3s ease;
+        }
+
+        /* Show overlay and prevent interaction */
+        .overlay.active {
+            opacity: 1;
+            pointer-events: all;
+            /* Now it blocks interactions */
+        }
+
+        /* Optional: Blur effect for the background */
+        .blur {
+            filter: blur(5px);
+            pointer-events: none;
+        }
+    </style>
+
+
+</head>
+
+<body>
+
+    <!-- Loading Spinner & Overlay -->
+    <div id="overlay" class="overlay">
+        <div class="spinner-border text-primary" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-light bg-light justify-content-between">
+        <a class="navbar-brand">File Sync Manager</a>
+        <a href="/" class="btn btn-primary">Go Back</a>
+    </nav>
+
+    <div class="container mt-5">
+        <h1>Create New Client</h1>
+        <!-- Create/Edit Client Form -->
+        <form id="createClientForm" class="mt-4" action="/submit-client" method="POST">
+            <input type="hidden" id="clientId" name="client_id"> <!-- Hidden field for client ID (used in edit) -->
+            <div class="form-row">
+                <div class="col-md-6">
+                    <label for="name">Client Name:</label>
+                    <input type="text" id="name" name="name" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="hostname">Hostname:</label>
+                    <input type="text" id="hostname" name="hostname" class="form-control" required>
+                </div>
+                <div class="col-md-6 mt-3">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" class="form-control" required>
+                </div>
+                <div class="col-md-6 mt-3 position-relative">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" class="form-control" required>
+                    <button type="button" class="btn btn-link position-absolute" style="top: 35px; right: 10px;"
+                        onclick="togglePassword()">
+                        <i class="fas fa-eye" id="togglePasswordIcon"></i>
+                    </button>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">Create Client</button>
+        </form>
+
+        <!-- Clients Table -->
+        <h2 class="mt-5">All Clients</h2>
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Hostname</th>
+                    <th>Username</th>
+                    <th>Password</th>
+                    <th>Operations</th>
+                </tr>
+            </thead>
+            <tbody id="clientTableBody">
+                {% if clients|length == 0 %}
+                <tr>
+                    <td colspan="6" class="text-center">No data</td>
+                </tr>
+                {% else %}
+                {% for client in clients %}
+                <tr>
+                    <td>{{ client.id }}</td>
+                    <td>{{ client.name }}</td>
+                    <td>{{ client.hostname }}</td>
+                    <td>{{ client.username }}</td>
+                    <td>
+                        <input type="password" class="form-control-plaintext" value="{{ client.password }}"
+                            id="passwordField-{{ client.id }}" readonly>
+                        <button class="btn btn-sm btn-link" onclick="toggleClientPassword({{ client.id }})">
+                            <i class="fas fa-eye" id="togglePasswordIcon-{{ client.id }}"></i>
+                        </button>
+                    </td>
+                    <td>
+                        <button class="btn btn-warning btn-sm" onclick="editClient({{ client.id }})">Edit</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteClient({{ client.id }})">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Password Visibility Toggle Script -->
+    <script>
+        // Get the overlay element
+        const overlay = document.getElementById("overlay");
+
+        // Function to show spinner and make background inaccessible
+        function showLoadingSpinner() {
+            overlay.classList.add('active');  // Show overlay
+            document.body.classList.add('blur');  // Add blur effect to background
+        }
+
+        // Function to hide spinner and restore the background
+        function hideLoadingSpinner() {
+            overlay.classList.remove('active');  // Hide overlay
+            document.body.classList.remove('blur');  // Remove blur effect from background
+        }
+
+        function togglePassword() {
+            const passwordField = document.getElementById('password');
+            const togglePasswordIcon = document.getElementById('togglePasswordIcon');
+            if (passwordField.type === 'password') {
+                passwordField.type = 'text';
+                togglePasswordIcon.classList.remove('fa-eye');
+                togglePasswordIcon.classList.add('fa-eye-slash');
+            } else {
+                passwordField.type = 'password';
+                togglePasswordIcon.classList.remove('fa-eye-slash');
+                togglePasswordIcon.classList.add('fa-eye');
+            }
+        }
+
+        function toggleClientPassword(clientId) {
+            const passwordField = document.getElementById(`passwordField-${clientId}`);
+            const toggleIcon = document.getElementById(`togglePasswordIcon-${clientId}`);
+
+            if (passwordField.type === 'password') {
+                passwordField.type = 'text';
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+            } else {
+                passwordField.type = 'password';
+                toggleIcon.classList.remove('fa-eye-slash');
+                toggleIcon.classList.add('fa-eye');
+            }
+        }
+
+        // Edit Client
+        function editClient(clientId) {
+            showLoadingSpinner();
+            $.get(`/client/${clientId}`, function (data) {
+                $('#clientId').val(data.id);  // Set hidden client ID field
+                $('#name').val(data.name);
+                $('#hostname').val(data.hostname);
+                $('#username').val(data.username);
+                $('#password').val(data.password);
+                $('button[type="submit"]').text('Update Client');  // Change button text
+                hideLoadingSpinner();
+            });
+            hideLoadingSpinner();
+        }
+
+        // Delete Client
+        function deleteClient(clientId) {
+            if (confirm("Are you sure you want to delete this client and all associated sync tasks?")) {
+                showLoadingSpinner();
+                $.ajax({
+                    url: `/delete-client/${clientId}`,
+                    type: 'DELETE',
+                    success: function (result) {
+                        // Clear form after success
+                        $('#createClientForm')[0].reset();
+                        $('button[type="submit"]').text('Create Client');
+                        hideLoadingSpinner();
+
+                        // Show toast message indicating that the client and associated sync tasks were deleted
+                        if (result.message) {
+                            showToast(result.message, 'danger');
+                        } else {
+                            showToast('Client and associated sync tasks deleted successfully!', 'danger');
+                        }
+
+                        loadClientTable();  // Reload the client table after deletion
+                    },
+                    error: function (xhr, status, error) {
+                        hideLoadingSpinner();
+                        showToast('Error deleting client: ' + xhr.responseText, 'danger');
+                    }
+                });
+                hideLoadingSpinner();
+            }
+        }
+
+
+        // Function to show toast with a modern design and a progress bar
+        function showToast(message, type) {
+            let toastContainer = document.getElementById("toast-container");
+
+            if (!toastContainer) {
+                console.log("Toast container not found!");
+                return;
+            }
+
+            // Clear any previous toasts
+            toastContainer.innerHTML = '';
+
+            // Create a new toast div with modern styling
+            let toast = document.createElement("div");
+            toast.className = `toast align-items-center text-white bg-${type} border-0 toast-modern show`;  // Use 'success' or 'danger' for type
+            toast.style.position = "fixed";
+            toast.style.top = "10px";
+            toast.style.right = "10px";
+            toast.style.minWidth = "250px";
+            toast.style.zIndex = "9999";  // Ensure it's above everything else
+            toast.innerHTML = `
+                        <div class="d-flex">
+                            <div class="toast-body">${message}</div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-progress"></div>`;  // Added progress bar here
+
+            // Add the toast to the container
+            toastContainer.appendChild(toast);
+
+            // Get the progress bar element and start the animation
+            let progressBar = toast.querySelector('.toast-progress');
+            progressBar.style.width = "100%";  // Set initial width
+            setTimeout(() => {
+                progressBar.style.width = "0%";  // Animate to 0 width over 3 seconds
+            }, 50);  // Start the animation after a slight delay
+
+            // Automatically remove the toast after 3 seconds
+            setTimeout(function () {
+                toast.classList.remove('show');
+                toast.addEventListener('transitionend', () => {
+                    toast.remove();
+                });
+            }, 3000);
+
+            // Close button functionality
+            toast.querySelector('.btn-close').addEventListener('click', function () {
+                toast.classList.remove('show');
+                toast.addEventListener('transitionend', () => {
+                    toast.remove();
+                });
+            });
+        }
+
+
+        // Form submit event
+        $('#createClientForm').submit(function (event) {
+            event.preventDefault();
+
+            let formData = $(this).serialize();
+
+            showLoadingSpinner();
+
+            $.post('/submit-client', formData, function (data) {
+                // Show toast message based on response
+                showToast(data.message, 'success');  // Show success toast
+                // Clear form after success
+                $('#createClientForm')[0].reset();
+                $('button[type="submit"]').text('Create Client');
+                $('#clientId').val('');
+
+                // Reload the client table
+                loadClientTable();
+            }).fail(function (jqXHR) {
+                // Show error toast
+                showToast('Error: ' + jqXHR.responseText, 'danger');
+            });
+            hideLoadingSpinner();
+        });
+
+        // Load client table dynamically after creating/updating client
+        function loadClientTable() {
+            showLoadingSpinner();
+            $.get('/clients', function (clients) {
+                let clientTableBody = $('#clientTableBody');
+                clientTableBody.empty();  // Clear the table
+
+                hideLoadingSpinner();
+
+                // Loop through clients and re-populate the table
+                clients.forEach(client => {
+                    clientTableBody.append(`
+                    <tr>
+                        <td>${client.id}</td>
+                        <td>${client.name}</td>
+                        <td>${client.hostname}</td>
+                        <td>${client.username}</td>
+                        <td>
+                            <input type="password" class="form-control-plaintext" value="${client.password}" id="passwordField-${client.id}" readonly>
+                            <button class="btn btn-sm btn-link" onclick="toggleClientPassword(${client.id})">
+                                <i class="fas fa-eye" id="togglePasswordIcon-${client.id}"></i>
+                            </button>
+                        </td>
+                        <td>
+                            <button class="btn btn-warning btn-sm" onclick="editClient(${client.id})">Edit</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteClient(${client.id})">Delete</button>
+                        </td>
+                    </tr>
+                `);
+                });
+            });
+            hideLoadingSpinner(); //
+        }
+    </script>
+</body>
+
+</html>
